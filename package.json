@@ -1,0 +1,15 @@
+{
+  "name": "sanad-learning-platform-cloudflare",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sanad Arabic learning platform for Thanaweya Amma and Bac 2",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create sanad-db",
+    "db:migrate:local": "wrangler d1 migrations apply sanad-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply sanad-db --remote"
+  },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}
