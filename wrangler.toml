@@ -11,5 +11,6 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "sanad-db"
+database_id = "ac17a84a-cbf2-45ca-94ea-42d7a75d5634"
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 migrations_dir = "migrations"
