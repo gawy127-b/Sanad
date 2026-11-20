@@ -30,7 +30,8 @@ async function handleApi(request, env) {
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('البريد الإلكتروني غير صحيح.');
   if(password.length<8||password.length>128) return fail('كلمة المرور يجب ألا تقل عن 8 أحرف.');
   if(!trackOK(track)) return fail('اختر المسار الدراسي.');
-  if(!env.PASSWORD_PEPPER) return fail('إعدادات حماية كلمات المرور غير مكتملة.',500);
+  if(!env.PASSWORD_PEPPER) return fail('إعداد الخادم ناقص: أضف السر PASSWORD_PEPPER في إعدادات Cloudflare Workers ثم أعد النشر.',500);
+  if(!env.SESSION_SECRET) return fail('إعداد الخادم ناقص: أضف السر SESSION_SECRET في إعدادات Cloudflare Workers ثم أعد النشر.',500);
   const hash=await hashPassword(password,env.PASSWORD_PEPPER);
   try { const r=await env.DB.prepare("INSERT INTO users(name,email,password_hash,track,role) VALUES(?,?,?,?,'student')").bind(name,email,hash,track).run(); const u=await env.DB.prepare('SELECT id,name,email,track,role,created_at FROM users WHERE id=?').bind(r.meta.last_row_id).first(); const token=await sign({id:u.id,exp:Math.floor(Date.now()/1000)+7*DAY},env.SESSION_SECRET); return json({user:safeUser(u)},201,{'set-cookie':setCookie(token)}); }
   catch(e){ return String(e).includes('UNIQUE')?fail('هذا البريد مسجل بالفعل.',409):fail('تعذر إنشاء الحساب حاليًا.',500); }
@@ -38,7 +39,8 @@ async function handleApi(request, env) {
  if (path === '/api/auth/login' && method === 'POST') {
   const b=await body(request), email=String(b.email||'').trim().toLowerCase(), password=String(b.password||'');
   const u=await env.DB.prepare('SELECT * FROM users WHERE email=?').bind(email).first();
-  if(!env.PASSWORD_PEPPER) return fail('إعدادات حماية كلمات المرور غير مكتملة.',500);
+  if(!env.PASSWORD_PEPPER) return fail('إعداد الخادم ناقص: أضف السر PASSWORD_PEPPER في إعدادات Cloudflare Workers ثم أعد النشر.',500);
+  if(!env.SESSION_SECRET) return fail('إعداد الخادم ناقص: أضف السر SESSION_SECRET في إعدادات Cloudflare Workers ثم أعد النشر.',500);
   if(!u || !(await checkPassword(password,u.password_hash,env.PASSWORD_PEPPER))) return fail('البريد الإلكتروني أو كلمة المرور غير صحيحة.',401);
   const token=await sign({id:u.id,exp:Math.floor(Date.now()/1000)+7*DAY},env.SESSION_SECRET);
   return json({user:safeUser(u)},200,{'set-cookie':setCookie(token)});
@@ -52,7 +54,8 @@ async function handleApi(request, env) {
   if(!env.ADMIN_SETUP_KEY || String(b.setupKey||'')!==env.ADMIN_SETUP_KEY) return fail('مفتاح الإعداد غير صحيح.',403);
   const name=String(b.name||'').trim(), email=String(b.email||'').trim().toLowerCase(), password=String(b.password||'');
   if(name.length<2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length<12) return fail('أدخل اسمًا وبريدًا صحيحًا وكلمة مرور لا تقل عن 12 حرفًا.');
-  if(!env.PASSWORD_PEPPER) return fail('إعدادات حماية كلمات المرور غير مكتملة.',500);
+  if(!env.PASSWORD_PEPPER) return fail('إعداد الخادم ناقص: أضف السر PASSWORD_PEPPER في إعدادات Cloudflare Workers ثم أعد النشر.',500);
+  if(!env.SESSION_SECRET) return fail('إعداد الخادم ناقص: أضف السر SESSION_SECRET في إعدادات Cloudflare Workers ثم أعد النشر.',500);
   const hash=await hashPassword(password,env.PASSWORD_PEPPER);
   try { const r=await env.DB.prepare("INSERT INTO users(name,email,password_hash,track,role) VALUES(?,?,?,'thanaweya','admin')").bind(name,email,hash).run(); const u=await env.DB.prepare('SELECT id,name,email,track,role,created_at FROM users WHERE id=?').bind(r.meta.last_row_id).first(); const token=await sign({id:u.id,exp:Math.floor(Date.now()/1000)+7*DAY},env.SESSION_SECRET); return json({user:safeUser(u)},201,{'set-cookie':setCookie(token)}); } catch(e) { return fail(String(e).includes('UNIQUE')?'البريد مستخدم بالفعل.':'تعذر إنشاء حساب المدير.',409); }
  }
