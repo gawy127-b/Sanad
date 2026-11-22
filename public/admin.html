@@ -14,7 +14,24 @@ $('#logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'});loc
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));['resources','questions','contests','users'].forEach(k=>$('#'+k+'Pane').classList.toggle('hidden',k!==b.dataset.tab))});
 async function loadAll(){const s=await api('/api/admin/overview');$('#stats').innerHTML=[['الطلاب',s.users],['المحتوى',s.resources],['الأسئلة',s.questions]].map(x=>`<div class="stat"><b>${x[1]}</b>${x[0]}</div>`).join('');await Promise.all([loadResources(),loadQuestions(),loadContests(),loadUsers()])}
 async function loadResources(){const d=await api('/api/admin/resources');$('#resourceList').innerHTML='<h2>المحتوى المنشور</h2>'+d.items.map(x=>`<div class="item"><span><b>${esc(x.title)}</b><div class="muted">${esc(x.subject)} · ${esc(x.track)}</div></span><button class="btn light" data-del-resource="${x.id}">حذف</button></div>`).join('')}
-$('#resourceForm').onsubmit=async e=>{e.preventDefault();try{await api('/api/admin/resources',{method:'POST',body:JSON.stringify(formData(e.target))});e.target.reset();await loadResources();msg('تم حفظ المحتوى.',true)}catch(x){msg(x.message)}};
+$('#resourceForm').onsubmit=async e=>{
+ e.preventDefault();
+ try{
+  const data=new FormData(e.target);
+  const r=await fetch('/api/admin/upload-resource',{
+   method:'POST',
+   credentials:'same-origin',
+   body:data
+  });
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw Error(d.error||'فشل رفع الملف');
+  e.target.reset();
+  await loadResources();
+  msg('تم رفع الملف وحفظ المحتوى بنجاح.',true);
+ }catch(x){
+  msg(x.message);
+ }
+};
 $('#resourceList').onclick=async e=>{const b=e.target.closest('[data-del-resource]');if(b&&confirm('حذف هذا المحتوى؟')){await api('/api/admin/resources/'+b.dataset.delResource,{method:'DELETE'});loadResources()}};
 async function loadQuestions(){const d=await api('/api/admin/questions');$('#questionList').innerHTML='<h2>الأسئلة الحالية</h2>'+d.items.map(x=>`<div class="item"><span><b>${esc(x.prompt)}</b><div class="muted">${esc(x.subject)} · ${esc(x.track)}</div></span><button class="btn light" data-del-question="${x.id}">حذف</button></div>`).join('')}
 $('#questionForm').onsubmit=async e=>{e.preventDefault();const f=formData(e.target),options=[f.o0,f.o1,f.o2,f.o3].filter(Boolean);if(Number(f.correct_index)>=options.length){msg('الإجابة الصحيحة لا تطابق الاختيارات');return}try{await api('/api/admin/questions',{method:'POST',body:JSON.stringify({...f,options,correct_index:Number(f.correct_index)})});e.target.reset();await loadQuestions();msg('تمت إضافة السؤال.',true)}catch(x){msg(x.message)}};
