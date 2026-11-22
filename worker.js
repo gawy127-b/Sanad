@@ -85,6 +85,30 @@ async function handleApi(request, env) {
   if(path==='/api/admin/overview'&&method==='GET'){const [users,resources,questions]=await Promise.all([env.DB.prepare('SELECT COUNT(*) n FROM users WHERE role=\'student\'').first(),env.DB.prepare('SELECT COUNT(*) n FROM resources').first(),env.DB.prepare('SELECT COUNT(*) n FROM questions').first()]);return json({users:users.n,resources:resources.n,questions:questions.n});}
   if(path==='/api/admin/users'&&method==='GET')return json({items:(await env.DB.prepare('SELECT id,name,email,track,created_at FROM users WHERE role=\'student\' ORDER BY id DESC LIMIT 300').all()).results});
   if(path==='/api/admin/resources'&&method==='GET')return json({items:(await env.DB.prepare('SELECT * FROM resources ORDER BY id DESC').all()).results});
+      if(path==='/api/admin/upload-resource'&&method==='POST'){
+    const form=await request.formData();
+    const file=form.get('file');
+    if(!file || typeof file==='string' || !file.size) return fail('اختار ملفًا أولًا.');
+    if(file.size>50*1024*1024) return fail('حجم الملف أكبر من 50 ميجابايت.');
+    if(!(file.type.startsWith('image/')||file.type.startsWith('video/')||file.type==='application/pdf')) return fail('المسموح صور وفيديو وPDF فقط.');
+    if(!env.IMAGEKIT_PRIVATE_KEY) return fail('مفتاح ImageKit غير مضبوط.',500);
+    const uploadForm=new FormData();
+    uploadForm.append('file',file,file.name);
+    uploadForm.append('fileName',file.name);
+    const response=await fetch('https://upload.imagekit.io/api/v1/files/upload',{
+     method:'POST',
+     headers:{Authorization:'Basic '+btoa(env.IMAGEKIT_PRIVATE_KEY+':')},
+     body:uploadForm
+    });
+    const uploaded=await response.json();
+    if(!response.ok||!uploaded.url) return fail('فشل رفع الملف إلى ImageKit.',502);
+    const track=['thanaweya','bac2','both'].includes(form.get('track'))?form.get('track'):'both';
+    const subject=String(form.get('subject')||'').trim();
+    const title=String(form.get('title')||'').trim();
+    if(!subject||!title) return fail('المادة والعنوان مطلوبان.');
+    const result=await env.DB.prepare('INSERT INTO resources(track,subject,title,description,kind,url) VALUES(?,?,?,?,?,?)').bind(track,subject,title,String(form.get('description')||''),String(form.get('kind')||'ملف'),uploaded.url).run();
+    return json({id:result.meta.last_row_id,url:uploaded.url},201);
+      }                                  
   if(path==='/api/admin/resources'&&method==='POST'){const b=await body(request),track=['thanaweya','bac2','both'].includes(b.track)?b.track:'both',subject=String(b.subject||'').trim(),title=String(b.title||'').trim();if(!subject||!title)return fail('المادة والعنوان مطلوبان.');const resourceUrl=String(b.url||'').trim();if(resourceUrl && !/^https?:\/\//i.test(resourceUrl))return fail('رابط المحتوى يجب أن يبدأ بـ https:// أو http://');const r=await env.DB.prepare('INSERT INTO resources(track,subject,title,description,kind,url) VALUES(?,?,?,?,?,?)').bind(track,subject,title,String(b.description||''),String(b.kind||'ملخص'),resourceUrl).run();return json({id:r.meta.last_row_id},201);}
   m=path.match(/^\/api\/admin\/resources\/(\d+)$/);if(m&&method==='DELETE'){await env.DB.prepare('DELETE FROM resources WHERE id=?').bind(Number(m[1])).run();return json({ok:true});}
   if(path==='/api/admin/questions'&&method==='GET')return json({items:(await env.DB.prepare('SELECT id,track,subject,prompt,options_json,correct_index,explanation FROM questions ORDER BY id DESC').all()).results.map(q=>({...q,options:JSON.parse(q.options_json)}))});
